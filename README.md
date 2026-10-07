@@ -131,6 +131,7 @@ $env:OPENOCD = "C:\tools\xpack-openocd-0.12.0-7\bin\openocd.exe"
 | 2026-10-08 | **Phase D 達成**: `app/phase_d_lcd` のテストカードが `ls0xx` ドライバ経由で正常表示。それまでの「白のまま」「不規則な縞」は **LCD の FPC の接点面が逆**だったのが原因。基板 rev1 はコネクタ向きが設計と逆で、**逆挿しで開発続行、次版で修正**（docs/hardware.md 参照）。第二マイルストーンの 3 要素（BLE・レバー・LCD）が個別に動作 |
 | 2026-10-08 | ZMK に LCD を統合（内蔵ステータス画面、LVGL 1bpp、プール 8 KiB、VDB 100%）: **FLASH 315,824 B (63.2%) / RAM 62,324 B (95.1%)**。表示系の増分は 20,480 B |
 | 2026-10-08 | **第二マイルストーン達成**: 内蔵ステータス画面が LCD に表示され、BLE・レバーと同時動作。部分描画（VDB 25%、X alignment 144）＋プール 4 KiB を実機で確認し採用: **RAM 53,620 B (81.8%)**。Prospector の受信機能はまだ無い（Phase E） |
+| 2026-10-08 | Phase E 準備: Prospector モジュールを west に追加、コアに observer 専用時の `bt_enable()` を追加、v1 の Pocket UI を載せる薄いシールド `scanner_pocket_v2` をモジュールに作成。方向の実測: **A observer 専用 = RAM 45,212 B (69.0%)**、B キーボード役＋observer = **5,108 B 超過でリンク不能**。A の試用 hex を `scanner_pocket_v2_observer.hex` として配布（docs/observer_trial.conf） |
 
 RAM: ZMK＋キーボード用 BLE スタックで 41.8 KiB、LCD（LVGL 1bpp、部分描画、プール 4 KiB）込みで 53.6 KiB（82%）。
 全フレーム VDB＋8 KiB プールだと 62.3 KiB（95%）になる。Phase E（observer 専用）では
