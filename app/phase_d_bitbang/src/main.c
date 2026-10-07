@@ -29,12 +29,14 @@
 
 static const struct device *g;
 
+static unsigned int half_us = 1;   /* clock half-period; 1 ~ 300 kHz, 5 ~ 60 kHz */
+
 static inline void clk_bit(int bit)
 {
     gpio_pin_set_raw(g, P_SI, bit);
-    k_busy_wait(1);
+    k_busy_wait(half_us);
     gpio_pin_set_raw(g, P_SCLK, 1);
-    k_busy_wait(1);
+    k_busy_wait(half_us);
     gpio_pin_set_raw(g, P_SCLK, 0);
 }
 
@@ -102,18 +104,28 @@ int main(void)
     gpio_pin_set_raw(g, P_DISP, 1);
     printk("Scanner Pocket v2 bit-bang: cleared, DISP high\n");
 
+    /*
+     * Speed test. 4-step cycle, 3 s each:
+     *   0: all black at FAST clock (~300 kHz)   2: all black at SLOW clock (~60 kHz)
+     *   1: CLEAR (white)                        3: CLEAR (white)
+     * Stripes at FAST but solid black at SLOW = signal integrity / FPC contact.
+     * Identical stripes at both speeds = protocol/addressing.
+     */
     uint32_t n = 0;
     int ext = 0;
     while (1) {
-        bool black = (n % 2) == 0;
-        if (black) {
+        int step = n % 4;
+        if (step == 0 || step == 2) {
+            half_us = (step == 0) ? 1 : 5;
             write_solid_frame(0);
+            printk("tick %u: ALL BLACK at %s clock\n", n, (step == 0) ? "FAST (~300 kHz)" : "SLOW (~60 kHz)");
         } else {
+            half_us = 1;
             clear_frame();
+            printk("tick %u: CLEAR (white)\n", n);
         }
         ext = !ext;
         gpio_pin_set_raw(g, P_EXT, ext);           /* VCOM inversion */
-        printk("tick %u: %s, EXTCOMIN=%d\n", n, black ? "ALL BLACK (line writes)" : "CLEAR (white)", ext);
         n++;
         k_msleep(3000);
     }
