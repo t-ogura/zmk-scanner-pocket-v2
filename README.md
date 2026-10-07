@@ -100,6 +100,25 @@ openocd.exe -f interface/cmsis-dap.cfg -f scripts\nrf52_recover_daponly.cfg `
 出荷時ブートローダは失われます（この設計では使わないので問題ない）。電源不足が原因ではなかった
 ことも確認済み（消去中の VTREF min 3.02 V、3.0 V 未満のサンプル 0）。
 
+### 電源を切ると再ロックされる（hardened APPROTECT）
+
+解除後に電源を入れ直すと**再びロック**されました。この個体は新しいシリコンリビジョンで、
+APPROTECT が電源投入時のデフォルトで有効になる仕様（hardened APPROTECT）です。
+開いた状態を保つには **UICR.APPROTECT = 0x5A（HwDisabled）** が書かれていて、かつファームウェアが
+起動時に `APPROTECT.DISABLE` を書く必要があります。後者は Zephyr の既定
+（`CONFIG_NRF_APPROTECT_USE_UICR=y` → MDK が `DISABLE = UICR.APPROTECT` を実行）で満たされます。
+
+したがって初回だけ、**解除 → 電源を切らずに → UICR に 0x5A → 書き込み** を一続きで行います:
+
+```powershell
+$env:OPENOCD = "C:\tools\xpack-openocd-0.12.0-7\bin\openocd.exe"
+.\scripts\first_flash.ps1 build-phase-a\zephyr\zephyr.hex -Speed 500
+```
+
+（Linux/WSL: `scripts/first_flash.sh`）。以後は UICR が 0x5A のまま残るので `flash.ps1` で普通に書けます。
+`flash write_image erase` はアプリのセクタしか消さないため UICR は保たれます。再び ERASEALL を
+したときだけ、もう一度 `first_flash` が必要です。
+
 ## 現状
 
 | 日付 | 内容 |
