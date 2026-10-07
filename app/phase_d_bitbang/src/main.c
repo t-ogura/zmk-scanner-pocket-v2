@@ -47,6 +47,24 @@ static void send_byte_lsb_first(uint8_t b)
     }
 }
 
+static void send_byte_msb_first(uint8_t b)
+{
+    for (int i = 7; i >= 0; i--) {
+        clk_bit((b >> i) & 1);
+    }
+}
+
+static bool addr_msb_first;   /* line-address bit order under test */
+
+static inline void send_line_addr(uint8_t ln)
+{
+    if (addr_msb_first) {
+        send_byte_msb_first(ln);
+    } else {
+        send_byte_lsb_first(ln);
+    }
+}
+
 static void scs_begin(void)
 {
     gpio_pin_set_raw(g, P_SCS, 1);
@@ -67,7 +85,7 @@ static void write_solid_frame(int pixel)
     scs_begin();
     send_byte_lsb_first(0x01);                 /* M0 write, M1 vcom=0, M2=0 */
     for (int ln = 1; ln <= LINES; ln++) {
-        send_byte_lsb_first((uint8_t)ln);      /* line address, 1-based */
+        send_line_addr((uint8_t)ln);           /* line address, 1-based */
         for (int i = 0; i < BYTES_PER_LINE; i++) {
             send_byte_lsb_first(data);
         }
@@ -105,22 +123,24 @@ int main(void)
     printk("Scanner Pocket v2 bit-bang: cleared, DISP high\n");
 
     /*
-     * Speed test. 4-step cycle, 3 s each:
-     *   0: all black at FAST clock (~300 kHz)   2: all black at SLOW clock (~60 kHz)
-     *   1: CLEAR (white)                        3: CLEAR (white)
-     * Stripes at FAST but solid black at SLOW = signal integrity / FPC contact.
-     * Identical stripes at both speeds = protocol/addressing.
+     * Line-address bit-order test. 4-step cycle, 3 s each:
+     *   0: all black, address LSB-first (Sharp spec / Zephyr driver)
+     *   1: CLEAR
+     *   2: all black, address MSB-first
+     *   3: CLEAR
+     * Whichever black step comes out solid is the order this panel wants.
+     * Data bytes are all zero here, so their bit order does not matter yet.
      */
+    half_us = 1;
     uint32_t n = 0;
     int ext = 0;
     while (1) {
         int step = n % 4;
         if (step == 0 || step == 2) {
-            half_us = (step == 0) ? 1 : 5;
+            addr_msb_first = (step == 2);
             write_solid_frame(0);
-            printk("tick %u: ALL BLACK at %s clock\n", n, (step == 0) ? "FAST (~300 kHz)" : "SLOW (~60 kHz)");
+            printk("tick %u: ALL BLACK, line address %s\n", n, addr_msb_first ? "MSB-first" : "LSB-first");
         } else {
-            half_us = 1;
             clear_frame();
             printk("tick %u: CLEAR (white)\n", n);
         }
