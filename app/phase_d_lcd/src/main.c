@@ -78,32 +78,27 @@ int main(void)
            caps.x_resolution, caps.y_resolution, caps.supported_pixel_formats);
 
     display_set_pixel_format(disp, PIXEL_FORMAT_MONO01);
-    draw_test_card();
-    int rc = push_lines(disp, 0, H);
-    printk("full frame write rc=%d\n", rc);
-    display_blanking_off(disp);
 
     /*
-     * Diagnostic loop (panel stayed white on the first try):
-     * alternate DISP every 2 s through the blanking API - the ls0xx driver
-     * maps blanking_on/off straight onto the DISP GPIO - and rewrite the
-     * test card each time DISP goes high.
-     *   panel changes every 2 s  -> DISP wiring is right, suspect SCLK/SI/SCS
-     *   panel never changes      -> DISP pin (P0.16) or LCD supply
+     * Black-frame test. The driver's init already sent CLEAR (all white) and
+     * left DISP high; DISP is never touched here. Every 3 s alternate:
+     *   all BLACK  -> proves full-line writes reach the panel
+     *   test card  -> proves the line format/bit order
+     * If the panel stays white through both, CLEAR (a 2-byte command) gets
+     * through but the multi-transfer line writes do not.
      */
-    bool blank = false;
     uint32_t n = 0;
     while (1) {
-        k_msleep(2000);
-        blank = !blank;
-        if (blank) {
-            display_blanking_on(disp);          /* DISP low  -> white */
+        bool black = (n % 2) == 0;
+        if (black) {
+            memset(frame, 0x00, sizeof(frame));
         } else {
             draw_test_card();
-            rc = push_lines(disp, 0, H);
-            display_blanking_off(disp);         /* DISP high -> show memory */
         }
-        printk("tick %u DISP=%s write rc=%d\n", ++n, blank ? "LOW (blank)" : "HIGH (show)", rc);
+        int rc = push_lines(disp, 0, H);
+        printk("tick %u: wrote %s, rc=%d\n", n, black ? "ALL BLACK" : "test card", rc);
+        n++;
+        k_msleep(3000);
     }
     return 0;
 }
