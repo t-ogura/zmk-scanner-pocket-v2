@@ -1,4 +1,8 @@
 # SPDX-License-Identifier: MIT
+#
+# Hardware-level defaults only (pure Zephyr). ZMK-specific options such as
+# ZMK_BLE / ZMK_KEYBOARD_NAME / SETTINGS_NVS are set in
+# config/scanner_pocket_v2.conf so that plain Zephyr samples still build.
 
 CONFIG_ARM_MPU=y
 CONFIG_HW_STACK_PROTECTION=y
@@ -12,10 +16,6 @@ CONFIG_USE_DT_CODE_PARTITION=y
 CONFIG_BUILD_OUTPUT_HEX=y
 
 CONFIG_MPU_ALLOW_FLASH_WRITE=y
-CONFIG_NVS=y
-CONFIG_SETTINGS_NVS=y
 CONFIG_FLASH=y
 CONFIG_FLASH_PAGE_LAYOUT=y
 CONFIG_FLASH_MAP=y
-
-CONFIG_ZMK_BLE=y

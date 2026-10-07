@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: MIT
+#
+# Keep this file pure Zephyr: the board must also build plain Zephyr samples
+# (app/phase_a_blink) where ZMK symbols do not exist. ZMK-specific settings
+# live in config/scanner_pocket_v2.conf.
 
 if BOARD_SCANNER_POCKET_V2
-
-config ZMK_KEYBOARD_NAME
-    default "ScanPocket v2"
 
 config BT_CTLR
     default BT

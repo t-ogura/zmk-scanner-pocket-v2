@@ -13,13 +13,13 @@ FDK **HY0020**（Nordic nRF52832、512 KiB / 64 KiB）を直載せした Scanner
 ```
 config/
 ├─ west.yml                      ZMK を 354cff9c（2026-01-17）に固定
-├─ scanner_pocket_v2.conf        ユーザ設定（最小）
+├─ scanner_pocket_v2.conf        ZMK 固有設定はすべてここ（ZMK_BLE, KEYBOARD_NAME, SETTINGS_NVS）
 ├─ scanner_pocket_v2.keymap      レバー 3 接点 → A / B / C
 └─ boards/t_ogura/scanner_pocket_v2/
    ├─ board.yml                  HWMv2 ボード定義（soc: nrf52832）
    ├─ Kconfig.scanner_pocket_v2  SOC_NRF52832_QFAA を選択
-   ├─ Kconfig.defconfig          キーボード名、BT_CTLR
-   ├─ scanner_pocket_v2_defconfig  MPU / NVS / FLASH / ZMK_BLE、HEX 出力、UF2 なし
+   ├─ Kconfig.defconfig          BT_CTLR のみ（純 Zephyr）
+   ├─ scanner_pocket_v2_defconfig  MPU / FLASH、HEX 出力、UF2 なし（純 Zephyr）
    ├─ scanner_pocket_v2.dts      チップ・パーティション・kscan・(disabled) LCD
    ├─ scanner_pocket_v2-pinctrl.dtsi  LCD SPI ピン
    ├─ board.cmake                west flash → openocd（cmsis-dap, nrf52）
@@ -28,6 +28,9 @@ app/phase_a_blink/               Phase A: ZMK 抜きの GPIO トグル（最初�
 scripts/flash.sh, flash.ps1      OpenOCD で program / verify / reset を 1 コマンド化
 build.yaml                       CI 用ビルド行列
 ```
+
+ボード定義は**純粋な Zephyr** に保っています（ZMK シンボルを一切含まない）。そうしないと ZMK 抜きの
+`app/phase_a_blink` が「未定義シンボル」の Kconfig 警告で止まるためで、ZMK 固有の設定は `config/scanner_pocket_v2.conf` 側に集めてあります。
 
 ボード定義を `config/boards/` に置いているのは、ZMK が `ZMK_CONFIG` を `BOARD_ROOT` に追加する
 （`zmk/app/keymap-module/modules/modules.cmake`）ため、追加の `zephyr/module.yml` 無しで
