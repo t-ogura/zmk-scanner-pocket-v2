@@ -28,9 +28,9 @@ Target 側 FFC（6 ピン）: 1 VCC / 2 SWD_CLK / 3 GND / 4 RST / 5 SWDIO / 6 VC
 | LCD SCLK | P0.06 | `spi1_default` pinctrl（SPI ノードは disabled のまま） |
 | LCD SI (MOSI) | P0.07 | 同上 |
 | LCD SCS | P0.08 | `cs-gpios`、**Active HIGH** |
-| LCD EXTCOMIN | P0.12 | `extcomin-gpios`。周波数はデータシートから（未記入） |
+| LCD EXTCOMIN | P0.12 | `extcomin-gpios`。周波数は **10 Hz 暫定**（データシート値に差し替え予定） |
 | LCD DISP | P0.16 | `disp-en-gpios`。初期化後 High |
-| レバー SW 1/2/3 | P0.18 / P0.20 / P0.30 | `kscan0` direct GPIO、pull-up、active-low |
+| レバー SW 1/2/3 | P0.18 / P0.20 / P0.30 | `kscan0` direct GPIO、pull-up、active-low。**2026-10-08 実機確認済み（確定扱いに昇格）** |
 
 ## LCD（Sharp LS013B7DH05、144×168、1bit）
 

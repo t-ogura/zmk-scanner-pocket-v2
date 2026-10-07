@@ -21,13 +21,15 @@
         zephyr,code-partition = &code_partition;
         zephyr,sram = &sram0;
         zephyr,flash = &flash0;
+        zephyr,display = &lcd;
         zmk,kscan = &kscan0;
         zmk,matrix-transform = &default_transform;
     };
 
     /*
      * Alps SLLB510100 lever switch, three contacts, read as direct GPIOs.
-     * PROVISIONAL (HANDOVER 14.3): P0.18 / P0.20 / P0.30.
+     * P0.18 / P0.20 / P0.30 - VERIFIED on hardware 2026-10-08 (all three
+     * produce their keycodes over BLE).
      */
     kscan0: kscan {
         compatible = "zmk,kscan-gpio-direct";
@@ -67,15 +69,26 @@
 };
 
 /*
- * Sharp LS013B7DH05 Memory LCD - Phase D.
- * Kept disabled until the LCD nets are confirmed on the finished PCB
- * (HANDOVER 14.2) and the EXTCOMIN rate is taken from the datasheet.
- * Zephyr's sharp,ls0xx driver already drives EXTCOMIN and DISP from the
- * properties below, which is exactly the EXTMODE=VCC scheme in HANDOVER 18.
+ * Sharp LS013B7DH05 Memory LCD (144 x 168, 1 bpp) - Phase D.
+ *
+ * Pins per HANDOVER 14.2 (SCLK P0.06, SI P0.07, SCS P0.08, EXTCOMIN P0.12,
+ * DISP P0.16). Not yet cross-checked against the KiCad netlist; the lever
+ * pins from the same table were right, and app/phase_d_lcd is the test.
+ *
+ * Electrical facts carried over from the v1 shield (zmk-scanner-pocket):
+ * SPI 1 MHz, SCS active HIGH, LSB-first - all of which Zephyr's sharp,ls0xx
+ * driver assumes. EXTMODE is tied to VCC on this board, so VCOM is inverted
+ * by toggling EXTCOMIN; the driver does that from extcomin-gpios.
  */
 &spi1 {
-    compatible = "nordic,nrf-spim";
-    status = "disabled";
+    /*
+     * nordic,nrf-spi (non-DMA), not nrf-spim: Zephyr refuses SPIM on the
+     * nRF52832 because of Product Anomaly 58 unless explicitly overridden,
+     * and the nrf52dk_nrf52832 board makes the same choice. 1 MHz to a
+     * write-only panel does not need DMA.
+     */
+    compatible = "nordic,nrf-spi";
+    status = "okay";
     pinctrl-0 = <&spi1_default>;
     pinctrl-1 = <&spi1_sleep>;
     pinctrl-names = "default", "sleep";
@@ -83,13 +96,18 @@
 
     lcd: ls013b7dh05@0 {
         compatible = "sharp,ls0xx";
-        status = "disabled";
+        status = "okay";
         reg = <0>;
         spi-max-frequency = <1000000>;
         width = <144>;
         height = <168>;
         extcomin-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-        /* extcomin-frequency = <TODO>;  take from the LS013B7DH05 datasheet, do not guess */
+        /*
+         * PROVISIONAL: 10 Hz sits inside every VCOM range quoted for Sharp
+         * memory LCDs (0.5-30 Hz / 1-60 Hz) and is well above the DC-balance
+         * minimum. Replace with the LS013B7DH05 datasheet figure once read.
+         */
+        extcomin-frequency = <10>;
         disp-en-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
     };
 };

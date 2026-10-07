@@ -25,6 +25,7 @@ config/
    ├─ board.cmake                west flash → openocd（cmsis-dap, nrf52）
    └─ *.yaml / *.zmk.yml         メタデータ
 app/phase_a_blink/               Phase A: ZMK 抜きの GPIO トグル（最初に SWD で書くもの）
+app/phase_d_lcd/                 Phase D: ZMK/LVGL 抜きで LCD にテストパターン（display API 直叩き）
 scripts/flash.sh, flash.ps1      OpenOCD で program / verify / reset を 1 コマンド化
 build.yaml                       CI 用ビルド行列
 ```
@@ -45,8 +46,8 @@ build.yaml                       CI 用ビルド行列
 | nRESET | `gpio-as-nreset` | P0.21 をリセットに。リセット SW と FFC の両方が効く |
 | DCDC | **無効（LDO）** | モジュール内 DCC/DEC4 結線は firmware だけで判断しない（資料 §24）。実測後に有効化 |
 | USB | 一切なし | nRF52832 に USB ペリフェラル無し。`ZMK_USB` は設定しない |
-| LCD ノード | DTS にあるが **disabled** | ネット名の KiCad 照合待ち。EXTCOMIN 周波数はデータシートから入れる |
-| レバー入力 | direct GPIO、**PROVISIONAL** | P0.18/20/30 は設計値。KiCad で確認するまで仮 |
+| LCD ノード | **有効**、SPI は `nordic,nrf-spi` | nRF52832 は PAN 58 で SPIM が既定無効。EXTCOMIN 10 Hz は**暫定**（データシート値に差し替え）。ネットは KiCad 未照合、`app/phase_d_lcd` で実機確認 |
+| レバー入力 | direct GPIO | P0.18/20/30 を**実機確認済み**（3 接点とも BLE で A/B/C が入る） |
 | コンソール | なし（必要時 RTT） | UART 未結線。`CONFIG_ZMK_RTT_LOGGING=y` で SWD 越しに読む |
 
 ## ビルド
@@ -124,7 +125,7 @@ $env:OPENOCD = "C:\tools\xpack-openocd-0.12.0-7\bin\openocd.exe"
 | 日付 | 内容 |
 |---|---|
 | 2026-10-08 | リポジトリ作成。HWMv2 ボード定義、ZMK ビルド成功: **FLASH 178,616 B (35.7%) / RAM 41,844 B (63.9%)**。Phase A アプリ作成 |
-| 2026-10-08 | 実機: プローブから SWD 疎通 OK。HY0020 は出荷時 APPROTECT 有効（hardened、電源断で再ロック）→ `first_flash.ps1` で解除＋UICR 0x5A＋Phase A 書き込み・verify 成功。**資料 §26 の 7 項目達成**。チップは nRF52832-CIAA G1。Phase A が実機で動作（RTT で `tick` カウント確認、`scripts/rtt.cfg`）。ZMK 本体も通常の `flash.ps1` で書込・verify OK（UICR 0x5A 後は `program` のリセットでも再ロックされない）。**Phase B 達成**: `ScanPocket v2` が BLE 広告として見える（プローブ給電下） |
+| 2026-10-08 | 実機: プローブから SWD 疎通 OK。HY0020 は出荷時 APPROTECT 有効（hardened、電源断で再ロック）→ `first_flash.ps1` で解除＋UICR 0x5A＋Phase A 書き込み・verify 成功。**資料 §26 の 7 項目達成**。チップは nRF52832-CIAA G1。Phase A が実機で動作（RTT で `tick` カウント確認、`scripts/rtt.cfg`）。ZMK 本体も通常の `flash.ps1` で書込・verify OK（UICR 0x5A 後は `program` のリセットでも再ロックされない）。**Phase B 達成**: BLE 広告が見える（プローブ給電下）。**Phase C 達成**: ペアリング後にレバー 3 接点で A/B/C 入力。名前を `Scanner Pocket` に変更。LCD ノード有効化＋`app/phase_d_lcd` 作成（実機未確認） |
 
 RAM は ZMK のキーボード用 BLE スタック込みで既に 64 KiB の 64%。Phase D で LVGL を載せる際は
 ヒープを 8〜16 KiB に抑え、フレームバッファ（3 KiB × 枚数）を数えること。
