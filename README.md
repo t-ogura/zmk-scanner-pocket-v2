@@ -128,7 +128,7 @@ $env:OPENOCD = "C:\tools\xpack-openocd-0.12.0-7\bin\openocd.exe"
 |---|---|
 | 2026-10-08 | リポジトリ作成。HWMv2 ボード定義、ZMK ビルド成功: **FLASH 178,616 B (35.7%) / RAM 41,844 B (63.9%)**。Phase A アプリ作成 |
 | 2026-10-08 | 実機: プローブから SWD 疎通 OK。HY0020 は出荷時 APPROTECT 有効（hardened、電源断で再ロック）→ `first_flash.ps1` で解除＋UICR 0x5A＋Phase A 書き込み・verify 成功。**資料 §26 の 7 項目達成**。チップは nRF52832-CIAA G1。Phase A が実機で動作（RTT で `tick` カウント確認、`scripts/rtt.cfg`）。ZMK 本体も通常の `flash.ps1` で書込・verify OK（UICR 0x5A 後は `program` のリセットでも再ロックされない）。**Phase B 達成**: BLE 広告が見える（プローブ給電下）。**Phase C 達成**: ペアリング後にレバー 3 接点で A/B/C 入力。名前を `Scanner Pocket` に変更。LCD ノード有効化＋`app/phase_d_lcd` 作成 |
-| 2026-10-08 | **Phase D 達成**: `app/phase_d_lcd` のテストカードが `ls0xx` ドライバ経由で正常表示。それまでの「白のまま」「不規則な縞」は **LCD の FPC の接点面が逆**だったのが原因（docs/hardware.md 参照）。第二マイルストーンの 3 要素（BLE・レバー・LCD）が個別に動作 |
+| 2026-10-08 | **Phase D 達成**: `app/phase_d_lcd` のテストカードが `ls0xx` ドライバ経由で正常表示。それまでの「白のまま」「不規則な縞」は **LCD の FPC の接点面が逆**だったのが原因。基板 rev1 はコネクタ向きが設計と逆で、**逆挿しで開発続行、次版で修正**（docs/hardware.md 参照）。第二マイルストーンの 3 要素（BLE・レバー・LCD）が個別に動作 |
 
 RAM は ZMK のキーボード用 BLE スタック込みで既に 64 KiB の 64%。Phase D で LVGL を載せる際は
 ヒープを 8〜16 KiB に抑え、フレームバッファ（3 KiB × 枚数）を数えること。
