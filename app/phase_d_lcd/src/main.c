@@ -83,24 +83,27 @@ int main(void)
     printk("full frame write rc=%d\n", rc);
     display_blanking_off(disp);
 
-    /* Bouncing 8-line black bar over the stripes area, once a second */
-    int bar = 8, dir = 8;
+    /*
+     * Diagnostic loop (panel stayed white on the first try):
+     * alternate DISP every 2 s through the blanking API - the ls0xx driver
+     * maps blanking_on/off straight onto the DISP GPIO - and rewrite the
+     * test card each time DISP goes high.
+     *   panel changes every 2 s  -> DISP wiring is right, suspect SCLK/SI/SCS
+     *   panel never changes      -> DISP pin (P0.16) or LCD supply
+     */
+    bool blank = false;
     uint32_t n = 0;
     while (1) {
-        k_msleep(1000);
-        /* restore the previous bar's rows, then paint the new bar */
-        int prev = bar;
-        bar += dir;
-        if (bar >= 48 || bar <= 0) { dir = -dir; bar += dir; }
-        draw_test_card();
-        for (int y = bar; y < bar + 8; y++) {
-            for (int x = 2; x < W - 2; x++) set_px(x, y, false);
+        k_msleep(2000);
+        blank = !blank;
+        if (blank) {
+            display_blanking_on(disp);          /* DISP low  -> white */
+        } else {
+            draw_test_card();
+            rc = push_lines(disp, 0, H);
+            display_blanking_off(disp);         /* DISP high -> show memory */
         }
-        int lo = prev < bar ? prev : bar;
-        rc = push_lines(disp, lo, 16);
-        if ((++n % 5) == 0) {
-            printk("tick %u bar=%d rc=%d\n", n, bar, rc);
-        }
+        printk("tick %u DISP=%s write rc=%d\n", ++n, blank ? "LOW (blank)" : "HIGH (show)", rc);
     }
     return 0;
 }
