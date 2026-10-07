@@ -1,6 +1,7 @@
 # Scanner Pocket v2 - FDK HY0020 module.
-# HY0020 = nRF52832 with 512 KiB flash / 64 KiB RAM, i.e. the QFAA memory map.
+# HY0020 = nRF52832-CIAA (WLCSP, build code G1 as reported by OpenOCD on the real
+# module), 512 KiB flash / 64 KiB RAM.
 # SPDX-License-Identifier: MIT
 
 config BOARD_SCANNER_POCKET_V2
-    select SOC_NRF52832_QFAA
+    select SOC_NRF52832_CIAA

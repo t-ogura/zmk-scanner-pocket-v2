@@ -6,8 +6,8 @@
 
 ## MCU
 
-FDK HY0020 = Nordic nRF52832、512 KiB Flash / 64 KiB RAM → Zephyr の SoC は `nrf52832_qfaa`
-（QFAB は 256K/32K なので違う）。USB なし。ブートローダなし、SWD で `zephyr.hex` を直接書く。
+FDK HY0020 = Nordic **nRF52832-CIAA**（WLCSP、build code G1。2026-10-08 に OpenOCD の `nrf5 info` で実機確認）、
+512 KiB Flash / 64 KiB RAM → Zephyr の SoC は `nrf52832_ciaa`（QFAA と同じメモリ、compatible だけ異なる）。USB なし。ブートローダなし、SWD で `zephyr.hex` を直接書く。
 
 ## 確定
 

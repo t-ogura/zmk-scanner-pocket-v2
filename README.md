@@ -40,7 +40,7 @@ build.yaml                       CI 用ビルド行列
 
 | 項目 | 判断 | 理由 |
 |---|---|---|
-| SoC | `nrf52832_qfaa` | HY0020 の 512K/64K に一致。QFAB は 256K/32K |
+| SoC | `nrf52832_ciaa` | 実機で OpenOCD が `nRF52832-CIAA (G1)` と報告。512K/64K。QFAA との差は compatible のみ |
 | ブートローダ | なし | SWD 直書きなので不要。アプリは 0x0 から、設定領域は末尾 24 KiB |
 | nRESET | `gpio-as-nreset` | P0.21 をリセットに。リセット SW と FFC の両方が効く |
 | DCDC | **無効（LDO）** | モジュール内 DCC/DEC4 結線は firmware だけで判断しない（資料 §24）。実測後に有効化 |
@@ -124,7 +124,7 @@ $env:OPENOCD = "C:\tools\xpack-openocd-0.12.0-7\bin\openocd.exe"
 | 日付 | 内容 |
 |---|---|
 | 2026-10-08 | リポジトリ作成。HWMv2 ボード定義、ZMK ビルド成功: **FLASH 178,616 B (35.7%) / RAM 41,844 B (63.9%)**。Phase A アプリ作成 |
-| 2026-10-08 | 実機: プローブから SWD 疎通（DPIDR 読取）OK。HY0020 は出荷時 APPROTECT 有効 → DAP-only スクリプトで解除成功。書き込みはこれから |
+| 2026-10-08 | 実機: プローブから SWD 疎通 OK。HY0020 は出荷時 APPROTECT 有効（hardened、電源断で再ロック）→ `first_flash.ps1` で解除＋UICR 0x5A＋Phase A 書き込み・verify 成功。**資料 §26 の 7 項目達成**。チップは nRF52832-CIAA G1 |
 
 RAM は ZMK のキーボード用 BLE スタック込みで既に 64 KiB の 64%。Phase D で LVGL を載せる際は
 ヒープを 8〜16 KiB に抑え、フレームバッファ（3 KiB × 枚数）を数えること。

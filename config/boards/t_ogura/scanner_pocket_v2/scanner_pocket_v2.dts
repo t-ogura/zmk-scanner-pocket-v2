@@ -1,5 +1,5 @@
 /*
- * Scanner Pocket v2 - FDK HY0020 (nRF52832 QFAA) on a custom PCB.
+ * Scanner Pocket v2 - FDK HY0020 (nRF52832-CIAA) on a custom PCB.
  *
  * Pin assignments come from HANDOVER sections 13-14. Items marked PROVISIONAL
  * are design-time values that still have to be confirmed against the finished
@@ -9,7 +9,7 @@
  */
 
 /dts-v1/;
-#include <nordic/nrf52832_qfaa.dtsi>
+#include <nordic/nrf52832_ciaa.dtsi>
 #include "scanner_pocket_v2-pinctrl.dtsi"
 #include <dt-bindings/zmk/matrix_transform.h>
 
