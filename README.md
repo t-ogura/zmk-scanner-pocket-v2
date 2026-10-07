@@ -78,11 +78,34 @@ scripts/flash.sh build/zephyr/zmk.hex            # Linux / WSL（usbipd で USB 
 初回は `--speed 500` 推奨。内部は `openocd -f interface/cmsis-dap.cfg -f target/nordic/nrf52.cfg -c "program <hex> verify reset exit"`。
 失敗時は `build/zephyr/flash.log` が残ります。`west flash -r openocd` も board.cmake で使えます。
 
+## APPROTECT の解除（出荷時ブートローダ入りの HY0020）
+
+HY0020 は出荷時にブートローダが書かれ、**APPROTECT（デバッグアクセス保護）が有効**でした。
+`init; reset halt` で `SWD DPIDR 0x2ba01477` は読めるのに `Could not find MEM-AP` と
+`AP lock engaged` が出るのがその症状です。
+
+OpenOCD 標準の `nrf52_recover` は**この個体では失敗します**（`ERASEALLSTATUS` が 1 のまま）。
+`target/nordic/nrf52.cfg` が作る Cortex-M ターゲットの examination がロック中は失敗し、
+その状態で発行した CTRL-AP ERASEALL が進まないためです。ターゲットを定義せず DAP だけで
+CTRL-AP を叩く [scripts/nrf52_recover_daponly.cfg](scripts/nrf52_recover_daponly.cfg) なら
+100 ms 以内に完了します（2026-10-08 実機確認）。
+
+```powershell
+openocd.exe -f interface/cmsis-dap.cfg -f scripts\nrf52_recover_daponly.cfg `
+  -c "adapter speed 500" -c "init" -c "recover_daponly" -c "exit"
+# APPROTECTSTATUS = 1 (after) が出たら、ターゲットを電源断（10 秒）→ 通常の init; reset halt
+```
+
+`target/nordic/nrf52.cfg` は**同時に読み込まない**こと。消去はフラッシュ全域と UICR を消し、
+出荷時ブートローダは失われます（この設計では使わないので問題ない）。電源不足が原因ではなかった
+ことも確認済み（消去中の VTREF min 3.02 V、3.0 V 未満のサンプル 0）。
+
 ## 現状
 
 | 日付 | 内容 |
 |---|---|
-| 2026-10-08 | リポジトリ作成。HWMv2 ボード定義、ZMK ビルド成功: **FLASH 178,616 B (35.7%) / RAM 41,844 B (63.9%)**。Phase A アプリ作成。**実機未接続**（プローブ・基板とも未検証） |
+| 2026-10-08 | リポジトリ作成。HWMv2 ボード定義、ZMK ビルド成功: **FLASH 178,616 B (35.7%) / RAM 41,844 B (63.9%)**。Phase A アプリ作成 |
+| 2026-10-08 | 実機: プローブから SWD 疎通（DPIDR 読取）OK。HY0020 は出荷時 APPROTECT 有効 → DAP-only スクリプトで解除成功。書き込みはこれから |
 
 RAM は ZMK のキーボード用 BLE スタック込みで既に 64 KiB の 64%。Phase D で LVGL を載せる際は
 ヒープを 8〜16 KiB に抑え、フレームバッファ（3 KiB × 枚数）を数えること。
