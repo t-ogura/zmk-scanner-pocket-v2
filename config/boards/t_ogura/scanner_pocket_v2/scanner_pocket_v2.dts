@@ -1,0 +1,113 @@
+/*
+ * Scanner Pocket v2 - FDK HY0020 (nRF52832 QFAA) on a custom PCB.
+ *
+ * Pin assignments come from HANDOVER sections 13-14. Items marked PROVISIONAL
+ * are design-time values that still have to be confirmed against the finished
+ * KiCad schematic; do not treat them as final.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+/dts-v1/;
+#include <nordic/nrf52832_qfaa.dtsi>
+#include "scanner_pocket_v2-pinctrl.dtsi"
+#include <dt-bindings/zmk/matrix_transform.h>
+
+/ {
+    model = "Scanner Pocket v2";
+    compatible = "t_ogura,scanner-pocket-v2";
+
+    chosen {
+        zephyr,code-partition = &code_partition;
+        zephyr,sram = &sram0;
+        zephyr,flash = &flash0;
+        zmk,kscan = &kscan0;
+        zmk,matrix-transform = &default_transform;
+    };
+
+    /*
+     * Alps SLLB510100 lever switch, three contacts, read as direct GPIOs.
+     * PROVISIONAL (HANDOVER 14.3): P0.18 / P0.20 / P0.30.
+     */
+    kscan0: kscan {
+        compatible = "zmk,kscan-gpio-direct";
+        wakeup-source;
+        input-gpios
+            = <&gpio0 18 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+            , <&gpio0 20 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+            , <&gpio0 30 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+            ;
+    };
+
+    default_transform: keymap_transform_0 {
+        compatible = "zmk,matrix-transform";
+        columns = <3>;
+        rows = <1>;
+        map = <RC(0,0) RC(0,1) RC(0,2)>;
+    };
+};
+
+&uicr {
+    /* P0.21 is the module's nRESET pad (HY0020 J4): reset switch + FFC programmer */
+    gpio-as-nreset;
+};
+
+/*
+ * Regulator left in LDO mode on purpose. The module wires DCC to DEC4, but
+ * DCDC mode is only enabled after the real board has been measured
+ * (HANDOVER 24: do not assume the module's power path from firmware alone).
+ */
+
+&gpiote {
+    status = "okay";
+};
+
+&gpio0 {
+    status = "okay";
+};
+
+/*
+ * Sharp LS013B7DH05 Memory LCD - Phase D.
+ * Kept disabled until the LCD nets are confirmed on the finished PCB
+ * (HANDOVER 14.2) and the EXTCOMIN rate is taken from the datasheet.
+ * Zephyr's sharp,ls0xx driver already drives EXTCOMIN and DISP from the
+ * properties below, which is exactly the EXTMODE=VCC scheme in HANDOVER 18.
+ */
+&spi1 {
+    compatible = "nordic,nrf-spim";
+    status = "disabled";
+    pinctrl-0 = <&spi1_default>;
+    pinctrl-1 = <&spi1_sleep>;
+    pinctrl-names = "default", "sleep";
+    cs-gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;   /* SCS is active HIGH on this panel */
+
+    lcd: ls013b7dh05@0 {
+        compatible = "sharp,ls0xx";
+        status = "disabled";
+        reg = <0>;
+        spi-max-frequency = <1000000>;
+        width = <144>;
+        height = <168>;
+        extcomin-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
+        /* extcomin-frequency = <TODO>;  take from the LS013B7DH05 datasheet, do not guess */
+        disp-en-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+    };
+};
+
+&flash0 {
+    partitions {
+        compatible = "fixed-partitions";
+        #address-cells = <1>;
+        #size-cells = <1>;
+
+        /* No bootloader: the application image starts at 0x0 (flashed over SWD) */
+        code_partition: partition@0 {
+            reg = <0x00000000 0x0007a000>;
+        };
+
+        /* Settings storage (NVS): 6 x 4 KiB pages at the top of flash */
+        storage_partition: partition@7a000 {
+            reg = <0x0007a000 0x00006000>;
+        };
+    };
+};

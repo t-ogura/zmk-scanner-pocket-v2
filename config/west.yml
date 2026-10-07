@@ -1,0 +1,16 @@
+manifest:
+  remotes:
+    - name: zmkfirmware
+      url-base: https://github.com/zmkfirmware
+
+  projects:
+    # Pinned to the ZMK commit verified against this board definition
+    # (Hardware Model v2, Zephyr 4.1.0+zmk-fixes, nRF52832 QFAA SoC
+    # support present). Bump deliberately, rebuild, then update this note.
+    - name: zmk
+      remote: zmkfirmware
+      revision: 354cff9c36b49eee6abbb8a61e6b927539aebbf2
+      import: app/west.yml
+
+  self:
+    path: config

@@ -1,0 +1,12 @@
+identifier: scanner_pocket_v2
+name: Scanner Pocket v2
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+supported:
+  - adc
+  - ble
+  - gpio
+  - spi

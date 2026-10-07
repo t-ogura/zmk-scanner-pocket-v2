@@ -1,0 +1,13 @@
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        default_layer {
+            /* SLLB510100 lever: three contacts, in GPIO order P0.18 / P0.20 / P0.30 */
+            bindings = <&kp A &kp B &kp C>;
+        };
+    };
+};

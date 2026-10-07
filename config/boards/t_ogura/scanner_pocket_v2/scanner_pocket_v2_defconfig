@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT
+
+CONFIG_ARM_MPU=y
+CONFIG_HW_STACK_PROTECTION=y
+
+CONFIG_PINCTRL=y
+CONFIG_GPIO=y
+
+# Application starts at 0x0 - there is no bootloader, the image is written
+# over SWD. The hex is what gets flashed; no UF2 output.
+CONFIG_USE_DT_CODE_PARTITION=y
+CONFIG_BUILD_OUTPUT_HEX=y
+
+CONFIG_MPU_ALLOW_FLASH_WRITE=y
+CONFIG_NVS=y
+CONFIG_SETTINGS_NVS=y
+CONFIG_FLASH=y
+CONFIG_FLASH_PAGE_LAYOUT=y
+CONFIG_FLASH_MAP=y
+
+CONFIG_ZMK_BLE=y

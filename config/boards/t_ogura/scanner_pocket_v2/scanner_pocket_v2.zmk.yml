@@ -1,0 +1,8 @@
+file_format: "1"
+id: scanner_pocket_v2
+name: Scanner Pocket v2
+type: board
+arch: arm
+outputs:
+  - ble
+url: https://github.com/t-ogura/zmk-scanner-pocket-v2

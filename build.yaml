@@ -1,0 +1,6 @@
+---
+# Scanner Pocket v2 - FDK HY0020 (nRF52832 QFAA). Flashed over SWD, so the
+# artifact of interest is zephyr.hex, not a UF2.
+include:
+  - board: scanner_pocket_v2
+    artifact-name: scanner_pocket_v2
