@@ -17,6 +17,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/printk.h>
+#include <zephyr/dt-bindings/gpio/nordic-nrf-gpio.h>
 
 #define P_SCLK 6
 #define P_SI   7
@@ -55,6 +56,7 @@ static void send_byte_msb_first(uint8_t b)
 }
 
 static bool addr_msb_first;   /* line-address bit order under test */
+static unsigned int settle_us; /* pause after each line address before pixel data */
 
 static inline void send_line_addr(uint8_t ln)
 {
@@ -91,6 +93,9 @@ static void write_frame(int kind)
     send_byte_lsb_first(0x01);                 /* M0 write, M1 vcom=0, M2=0 */
     for (int ln = 1; ln <= LINES; ln++) {
         send_line_addr((uint8_t)ln);           /* line address, 1-based */
+        if (settle_us) {
+            k_busy_wait(settle_us);            /* let SI settle low after the address bits */
+        }
         for (int i = 0; i < BYTES_PER_LINE; i++) {
             uint8_t data;
             switch (kind) {
@@ -134,20 +139,29 @@ int main(void)
     printk("Scanner Pocket v2 bit-bang: cleared, DISP high\n");
 
     /*
-     * Pattern test, 6 steps of 3 s: black / CLEAR / h-bands / CLEAR /
-     * v-bands / CLEAR. How each known pattern is rendered reveals how the
-     * panel is parsing the stream (line framing, bit order, dropped bits).
+     * Analog-vs-protocol test, 4 steps of 3 s:
+     *   0: solid black, standard drive, no settle   (baseline = the photo)
+     *   1: CLEAR
+     *   2: solid black, HIGH drive (H0H1) on SCLK/SI/SCS, 50 us after each address
+     *   3: CLEAR
+     * If step 2 is solid black the lines are electrically marginal; if it
+     * looks like step 0 the problem is in the bit stream itself.
      */
     half_us = 1;
     addr_msb_first = false;
-    static const char *names[] = { "SOLID BLACK", "HORIZONTAL 8-line bands", "VERTICAL 8-px bands" };
     uint32_t n = 0;
     int ext = 0;
     while (1) {
-        int step = n % 6;
-        if ((step % 2) == 0) {
-            write_frame(step / 2);
-            printk("tick %u: %s\n", n, names[step / 2]);
+        int step = n % 4;
+        if (step == 0 || step == 2) {
+            bool strong = (step == 2);
+            gpio_flags_t ds = strong ? NRF_GPIO_DRIVE_H0H1 : NRF_GPIO_DRIVE_S0S1;
+            gpio_pin_configure(g, P_SCLK, GPIO_OUTPUT_LOW | ds);
+            gpio_pin_configure(g, P_SI,   GPIO_OUTPUT_LOW | ds);
+            gpio_pin_configure(g, P_SCS,  GPIO_OUTPUT_LOW | ds);
+            settle_us = strong ? 50 : 0;
+            write_frame(0);
+            printk("tick %u: SOLID BLACK, %s\n", n, strong ? "HIGH drive + 50us settle" : "standard drive");
         } else {
             clear_frame();
             printk("tick %u: CLEAR (white)\n", n);
