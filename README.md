@@ -129,9 +129,12 @@ $env:OPENOCD = "C:\tools\xpack-openocd-0.12.0-7\bin\openocd.exe"
 | 2026-10-08 | リポジトリ作成。HWMv2 ボード定義、ZMK ビルド成功: **FLASH 178,616 B (35.7%) / RAM 41,844 B (63.9%)**。Phase A アプリ作成 |
 | 2026-10-08 | 実機: プローブから SWD 疎通 OK。HY0020 は出荷時 APPROTECT 有効（hardened、電源断で再ロック）→ `first_flash.ps1` で解除＋UICR 0x5A＋Phase A 書き込み・verify 成功。**資料 §26 の 7 項目達成**。チップは nRF52832-CIAA G1。Phase A が実機で動作（RTT で `tick` カウント確認、`scripts/rtt.cfg`）。ZMK 本体も通常の `flash.ps1` で書込・verify OK（UICR 0x5A 後は `program` のリセットでも再ロックされない）。**Phase B 達成**: BLE 広告が見える（プローブ給電下）。**Phase C 達成**: ペアリング後にレバー 3 接点で A/B/C 入力。名前を `Scanner Pocket` に変更。LCD ノード有効化＋`app/phase_d_lcd` 作成 |
 | 2026-10-08 | **Phase D 達成**: `app/phase_d_lcd` のテストカードが `ls0xx` ドライバ経由で正常表示。それまでの「白のまま」「不規則な縞」は **LCD の FPC の接点面が逆**だったのが原因。基板 rev1 はコネクタ向きが設計と逆で、**逆挿しで開発続行、次版で修正**（docs/hardware.md 参照）。第二マイルストーンの 3 要素（BLE・レバー・LCD）が個別に動作 |
+| 2026-10-08 | ZMK に LCD を統合（内蔵ステータス画面、LVGL 1bpp、プール 8 KiB、VDB 100%）: **FLASH 315,824 B (63.2%) / RAM 62,324 B (95.1%)**。表示系の増分は 20,480 B。実機確認待ち（第二マイルストーン） |
 
-RAM は ZMK のキーボード用 BLE スタック込みで既に 64 KiB の 64%。Phase D で LVGL を載せる際は
-ヒープを 8〜16 KiB に抑え、フレームバッファ（3 KiB × 枚数）を数えること。
+RAM: ZMK＋キーボード用 BLE スタックで 41.8 KiB、LCD（LVGL 1bpp）を足すと 62.3 KiB（95%）。
+残り 3 KiB。削減余地: VDB を部分描画（`LV_Z_VDB_SIZE` 25% ＋ `LV_Z_AREA_X_ALIGNMENT_WIDTH=144` で
+ls0xx の全幅要件を満たす）と ZMK 既定のプール 4 KiB で 8 KiB 前後。Phase E（observer 専用）では
+キーボード用 BLE スタックが不要になり、v1 の測定では約 32 KiB 戻る。
 
 ## 既知の注意
 
