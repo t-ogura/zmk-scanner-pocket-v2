@@ -25,14 +25,25 @@ Target 側 FFC（6 ピン）: 1 VCC / 2 SWD_CLK / 3 GND / 4 RST / 5 SWDIO / 6 VC
 
 | 機能 | nRF52832 | DTS での扱い |
 |---|---|---|
-| LCD SCLK | P0.06 | `spi1_default` pinctrl（SPI ノードは disabled のまま） |
-| LCD SI (MOSI) | P0.07 | 同上 |
-| LCD SCS | P0.08 | `cs-gpios`、**Active HIGH** |
-| LCD EXTCOMIN | P0.12 | `extcomin-gpios`。周波数は **10 Hz 暫定**（データシート値に差し替え予定） |
-| LCD DISP | P0.16 | `disp-en-gpios`。初期化後 High |
+| LCD SCLK | P0.06 | `spi1_default` pinctrl。**実機確認済み** |
+| LCD SI (MOSI) | P0.07 | 同上。**実機確認済み** |
+| LCD SCS | P0.08 | `cs-gpios`、**Active HIGH**。**実機確認済み** |
+| LCD EXTCOMIN | P0.12 | `extcomin-gpios`。**実機確認済み**。周波数は 10 Hz 暫定（データシート値に差し替え予定） |
+| LCD DISP | P0.16 | `disp-en-gpios`。初期化後 High。**実機確認済み**（ピン探索ファームでも確認） |
 | レバー SW 1/2/3 | P0.18 / P0.20 / P0.30 | `kscan0` direct GPIO、pull-up、active-low。**2026-10-08 実機確認済み（確定扱いに昇格）** |
 
 ## LCD（Sharp LS013B7DH05、144×168、1bit）
+
+> **2026-10-08 実機確認済み**: SCLK P0.06 / SI P0.07 / SCS P0.08 / EXTCOMIN P0.12 / DISP P0.16 で
+> Zephyr の `sharp,ls0xx` ドライバ（`nordic,nrf-spi`、1 MHz、CS Active HIGH、LSB first、
+> CS 遅延 0）が**そのまま正常動作**する。上表の「要確認」は解消。
+>
+> **FPC の向きに注意。** 接点面が逆でも DISP・電源・一部の信号は絶縁面越しに薄く導通し、
+> 「CLEAR だけ効く」「全画素黒を書くと不規則な縞」「駆動強度やタイミングで模様が変わる」
+> 「指で押しても変わらない」という、電気的・プロトコル的な故障にそっくりな症状になる
+> （`docs/lcd_stripes_2026-10-08.jpg`）。LCD が白のまま、または縞が出るときは、
+> **信号やファームを疑う前に FPC の接点面の向きと挿入深さを確認すること。**
+
 
 - `EXTMODE = VCC`（外部 VCOM 反転）→ firmware が EXTCOMIN を周期トグルする。Zephyr の
   `sharp,ls0xx` ドライバが `extcomin-gpios` + `extcomin-frequency` で面倒を見る
