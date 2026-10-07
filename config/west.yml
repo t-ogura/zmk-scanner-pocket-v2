@@ -2,6 +2,11 @@ manifest:
   remotes:
     - name: zmkfirmware
       url-base: https://github.com/zmkfirmware
+    # prospector-zmk-module, from the local checkout that carries the
+    # v2.2.3 scanner core and the Scanner Pocket shield (branch not pushed
+    # yet). Switch url-base to https://github.com/t-ogura once it is.
+    - name: prospector-local
+      url-base: file:///home/ogu/workspace/prospector/zmk-scanner-pocket/modules
 
   projects:
     # Pinned to the ZMK commit verified against this board definition
@@ -11,6 +16,11 @@ manifest:
       remote: zmkfirmware
       revision: 354cff9c36b49eee6abbb8a61e6b927539aebbf2
       import: app/west.yml
+
+    - name: prospector-zmk-module
+      remote: prospector-local
+      revision: feature/scanner-pocket-v2.3
+      path: modules/prospector-zmk-module
 
   self:
     path: config
