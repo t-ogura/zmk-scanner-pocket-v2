@@ -57,6 +57,7 @@ static void send_byte_msb_first(uint8_t b)
 
 static bool addr_msb_first;   /* line-address bit order under test */
 static unsigned int settle_us; /* pause after each line address before pixel data */
+static unsigned int line_gap_ms; /* pause after each full line (lets a sagging rail recover) */
 
 static inline void send_line_addr(uint8_t ln)
 {
@@ -106,6 +107,9 @@ static void write_frame(int kind)
             send_byte_lsb_first(data);
         }
         send_byte_lsb_first(0x00);             /* 8 dummy bits */
+        if (line_gap_ms) {
+            k_msleep(line_gap_ms);             /* SCS stays high; panel tolerates idle SCLK */
+        }
     }
     send_byte_lsb_first(0x00);                 /* 16 trailing dummy bits */
     send_byte_lsb_first(0x00);
@@ -139,29 +143,35 @@ int main(void)
     printk("Scanner Pocket v2 bit-bang: cleared, DISP high\n");
 
     /*
-     * Analog-vs-protocol test, 4 steps of 3 s:
-     *   0: solid black, standard drive, no settle   (baseline = the photo)
+     * Supply-sag test, 6 steps of 3 s:
+     *   0: solid black, standard drive                      (baseline = photo)
      *   1: CLEAR
-     *   2: solid black, HIGH drive (H0H1) on SCLK/SI/SCS, 50 us after each address
+     *   2: solid black, HIGH drive + 50 us settle            (half black last time)
      *   3: CLEAR
-     * If step 2 is solid black the lines are electrically marginal; if it
-     * looks like step 0 the problem is in the bit stream itself.
+     *   4: solid black, HIGH drive + 50 us settle + 2 ms pause after every line
+     *   5: CLEAR
+     * Step 4 stretches the frame to ~0.4 s with the bus idle most of the time.
+     * If the panel's supply sags under write current, the pauses let it
+     * recover and step 4 comes out solid black.
      */
     half_us = 1;
     addr_msb_first = false;
     uint32_t n = 0;
     int ext = 0;
     while (1) {
-        int step = n % 4;
-        if (step == 0 || step == 2) {
-            bool strong = (step == 2);
-            gpio_flags_t ds = strong ? NRF_GPIO_DRIVE_H0H1 : NRF_GPIO_DRIVE_S0S1;
+        int step = n % 6;
+        if ((step % 2) == 0) {
+            int variant = step / 2;
+            gpio_flags_t ds = variant ? NRF_GPIO_DRIVE_H0H1 : NRF_GPIO_DRIVE_S0S1;
             gpio_pin_configure(g, P_SCLK, GPIO_OUTPUT_LOW | ds);
             gpio_pin_configure(g, P_SI,   GPIO_OUTPUT_LOW | ds);
             gpio_pin_configure(g, P_SCS,  GPIO_OUTPUT_LOW | ds);
-            settle_us = strong ? 50 : 0;
+            settle_us = variant ? 50 : 0;
+            line_gap_ms = (variant == 2) ? 2 : 0;
             write_frame(0);
-            printk("tick %u: SOLID BLACK, %s\n", n, strong ? "HIGH drive + 50us settle" : "standard drive");
+            printk("tick %u: SOLID BLACK, %s\n", n,
+                   variant == 0 ? "standard drive" :
+                   variant == 1 ? "HIGH drive + settle" : "HIGH drive + settle + 2 ms/line gap");
         } else {
             clear_frame();
             printk("tick %u: CLEAR (white)\n", n);
