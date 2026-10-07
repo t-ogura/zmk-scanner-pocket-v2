@@ -78,15 +78,26 @@ static void scs_end(void)
     k_busy_wait(10);               /* twSCSL >= 6 us */
 }
 
-/* M0=1: write lines. Fill every pixel with `pixel` (0 = black, 1 = white). */
-static void write_solid_frame(int pixel)
+/*
+ * M0=1: write every line. `kind` selects the frame content:
+ *   0  solid black
+ *   1  horizontal bands: lines 1-8 black, 9-16 white, 17-24 black, ...
+ *   2  vertical bands:   byte 0 black (px 1-8), byte 1 white, byte 2 black, ...
+ * Pixel bit 1 = white, 0 = black. Data bytes go LSB-first (Zephyr driver order).
+ */
+static void write_frame(int kind)
 {
-    uint8_t data = pixel ? 0xff : 0x00;
     scs_begin();
     send_byte_lsb_first(0x01);                 /* M0 write, M1 vcom=0, M2=0 */
     for (int ln = 1; ln <= LINES; ln++) {
         send_line_addr((uint8_t)ln);           /* line address, 1-based */
         for (int i = 0; i < BYTES_PER_LINE; i++) {
+            uint8_t data;
+            switch (kind) {
+            case 1:  data = (((ln - 1) / 8) % 2) ? 0xff : 0x00; break;
+            case 2:  data = (i % 2) ? 0xff : 0x00; break;
+            default: data = 0x00; break;
+            }
             send_byte_lsb_first(data);
         }
         send_byte_lsb_first(0x00);             /* 8 dummy bits */
@@ -123,23 +134,20 @@ int main(void)
     printk("Scanner Pocket v2 bit-bang: cleared, DISP high\n");
 
     /*
-     * Line-address bit-order test. 4-step cycle, 3 s each:
-     *   0: all black, address LSB-first (Sharp spec / Zephyr driver)
-     *   1: CLEAR
-     *   2: all black, address MSB-first
-     *   3: CLEAR
-     * Whichever black step comes out solid is the order this panel wants.
-     * Data bytes are all zero here, so their bit order does not matter yet.
+     * Pattern test, 6 steps of 3 s: black / CLEAR / h-bands / CLEAR /
+     * v-bands / CLEAR. How each known pattern is rendered reveals how the
+     * panel is parsing the stream (line framing, bit order, dropped bits).
      */
     half_us = 1;
+    addr_msb_first = false;
+    static const char *names[] = { "SOLID BLACK", "HORIZONTAL 8-line bands", "VERTICAL 8-px bands" };
     uint32_t n = 0;
     int ext = 0;
     while (1) {
-        int step = n % 4;
-        if (step == 0 || step == 2) {
-            addr_msb_first = (step == 2);
-            write_solid_frame(0);
-            printk("tick %u: ALL BLACK, line address %s\n", n, addr_msb_first ? "MSB-first" : "LSB-first");
+        int step = n % 6;
+        if ((step % 2) == 0) {
+            write_frame(step / 2);
+            printk("tick %u: %s\n", n, names[step / 2]);
         } else {
             clear_frame();
             printk("tick %u: CLEAR (white)\n", n);
