@@ -3,3 +3,7 @@ on: [push, pull_request, workflow_dispatch]
 jobs:
   build:
     uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
+    with:
+      # No bootloader on the HY0020: the image is written over SWD, so the
+      # artifact of interest is the Intel HEX, not a UF2 or a raw .bin.
+      fallback_binary: hex

@@ -24,9 +24,11 @@ OPENOCD="${OPENOCD:-$HOME/.local/opt/openocd/bin/openocd}"
 if [ ! -f "$FW" ]; then
   echo "firmware not found: $FW" >&2; exit 1
 fi
+ADDR=""
 case "$FW" in
   *.hex|*.elf) ;;
-  *) echo "use a .hex or .elf (a .bin needs an explicit load address)" >&2; exit 1 ;;
+  *.bin) ADDR="0x0" ;;   # raw image; this board's application starts at 0x0
+  *) echo "use a .hex, .elf or .bin" >&2; exit 1 ;;
 esac
 if ! command -v "$OPENOCD" >/dev/null 2>&1; then
   echo "openocd not found at $OPENOCD (set OPENOCD=/path/to/openocd)" >&2; exit 1
@@ -38,7 +40,7 @@ if "$OPENOCD" \
     -f interface/cmsis-dap.cfg \
     -f target/nordic/nrf52.cfg \
     -c "adapter speed ${SPEED}" \
-    -c "program ${FW} ${VERIFY} reset exit" >"$LOG" 2>&1; then
+    -c "program ${FW} ${ADDR} ${VERIFY} reset exit" >"$LOG" 2>&1; then
   grep -E "Verified OK|wrote|Programming Finished" "$LOG" || true
   echo "done"
 else

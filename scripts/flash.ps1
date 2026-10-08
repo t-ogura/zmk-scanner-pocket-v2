@@ -20,7 +20,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path $Firmware)) { throw "firmware not found: $Firmware" }
-if ($Firmware -notmatch '\.(hex|elf)$') { throw "use a .hex or .elf" }
+if ($Firmware -notmatch '\.(hex|elf|bin)$') { throw "use a .hex, .elf or .bin" }
 
 $openocd = if ($env:OPENOCD) { $env:OPENOCD } else { "openocd" }
 if (-not (Get-Command $openocd -ErrorAction SilentlyContinue)) {
@@ -33,9 +33,11 @@ $log    = Join-Path (Split-Path $fwPath -Parent) "flash.log"
 $verify = if ($NoVerify) { "" } else { "verify" }
 
 $cfg = Join-Path $env:TEMP "scanner_pocket_flash.cfg"
+# A raw .bin carries no address; this board's application starts at 0x0.
+$addr = if ($fw -match '\.bin$') { "0x0" } else { "" }
 @"
 adapter speed $Speed
-program {$fw} $verify reset exit
+program {$fw} $addr $verify reset exit
 "@ | Set-Content -Path $cfg -Encoding ASCII
 
 Write-Host "flashing $Firmware via CMSIS-DAP @ $Speed kHz"

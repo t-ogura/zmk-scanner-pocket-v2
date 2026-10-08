@@ -71,7 +71,7 @@ python3 -m venv .venv && .venv/bin/pip install west
 
 - `scanner_pocket_v2`（board）: この基板の定義。`config/boards/t_ogura/scanner_pocket_v2/`
 - `scanner_pocket_v2`（shield）: Prospector モジュール側。observer の Kconfig と Pocket UI（`pocket_display.c`）を載せる
-- GitHub Actions（`.github/workflows/build.yaml`）でも同じものがビルドされます
+- GitHub Actions（`.github/workflows/build.yaml`）でも同じものがビルドされ、成果物は `scanner_pocket_v2.hex`（`fallback_binary: hex`。既定だと `.bin` になる）。`.bin` でも `flash.ps1` / `flash.sh` は 0x0 に書けます
 
 Zephyr SDK 0.16.5 / ZMK は `config/west.yml` で固定（2026-01-17 の `354cff9c`）。
 
