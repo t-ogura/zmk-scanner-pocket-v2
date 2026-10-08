@@ -1,13 +1,17 @@
 #include <behaviors.dtsi>
 #include <dt-bindings/zmk/keys.h>
 
+/*
+ * The Scanner Pocket is not a keyboard. The only kscan key is a parked
+ * dummy on P0.28 (see the board devicetree); the lever is handled by the
+ * display code as UI navigation.
+ */
 / {
     keymap {
         compatible = "zmk,keymap";
 
         default_layer {
-            /* SLLB510100 lever: three contacts, in GPIO order P0.18 / P0.20 / P0.30 */
-            bindings = <&kp A &kp B &kp C>;
+            bindings = <&none>;
         };
     };
 };
