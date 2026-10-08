@@ -9,6 +9,9 @@ CONFIG_HW_STACK_PROTECTION=y
 
 CONFIG_PINCTRL=y
 CONFIG_GPIO=y
+# The LS013B7DH05 hangs off spi1. Stated here because the out-of-tree rotated
+# panel driver does not `select SPI` the way Zephyr's stock ls0xx does.
+CONFIG_SPI=y
 
 # Application starts at 0x0 - there is no bootloader, the image is written
 # over SWD. The hex is what gets flashed; no UF2 output.
