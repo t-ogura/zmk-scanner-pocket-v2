@@ -3,4 +3,5 @@
 # artifact of interest is zephyr.hex, not a UF2.
 include:
   - board: scanner_pocket_v2
+    shield: scanner_pocket_v2
     artifact-name: scanner_pocket_v2
