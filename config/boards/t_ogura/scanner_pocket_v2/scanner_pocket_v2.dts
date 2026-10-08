@@ -22,6 +22,7 @@
         zephyr,sram = &sram0;
         zephyr,flash = &flash0;
         zephyr,display = &lcd;
+        zmk,battery = &vbatt;
         zmk,kscan = &kscan0;
         zmk,matrix-transform = &default_transform;
     };
@@ -59,6 +60,11 @@
         input-gpios = <&gpio0 28 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
     };
 
+    /* CR2032 gauge: the SAADC samples VDD directly, no divider (HANDOVER 15) */
+    vbatt: vbatt {
+        compatible = "prospector,battery-nrf-vdd";
+    };
+
     default_transform: keymap_transform_0 {
         compatible = "zmk,matrix-transform";
         columns = <1>;
@@ -77,6 +83,10 @@
  * DCDC mode is only enabled after the real board has been measured
  * (HANDOVER 24: do not assume the module's power path from firmware alone).
  */
+
+&adc {
+    status = "okay";
+};
 
 &gpiote {
     status = "okay";
