@@ -136,10 +136,27 @@ $env:OPENOCD = "C:\tools\xpack-openocd-0.12.0-7\bin\openocd.exe"
 | 2026-10-08 | Phase E 準備: Prospector モジュールを west に追加、コアに observer 専用時の `bt_enable()` を追加、v1 の Pocket UI を載せる薄いシールド `scanner_pocket_v2` をモジュールに作成。方向の実測: **A observer 専用 = RAM 45,212 B (69.0%)**、B キーボード役＋observer = **5,108 B 超過でリンク不能**。A の試用 hex を `scanner_pocket_v2_observer.hex` として配布 |
 | 2026-10-08 | 初回は白画面＋表示スレッドで BUS FAULT。原因は `SHIELD_SCANNER_POCKET=y` の副作用（v1 の回転ドライバが選ばれ DISP が上がらず、幅 168 に対し整列幅 144 で LVGL ヒープ破壊）。外して修正、プール 16 KiB |
 | 2026-10-08 | **Phase E 受信成功**: observer 専用構成で Pocket UI が表示され、近くの Prospector キーボードの情報を読み取る。**RAM 44,060 B (67.2%) / FLASH 196,744 B**。この構成を正式採用（`CONFIG_ZMK_BLE=n`、shield `scanner_pocket_v2`） |
+| 2026-10-08 | **横向き表示 OK**（v1 回転ドライバに DISP/EXTCOMIN 対応を追加、RAM 47,132 B = 71.9%）。**レバー**: 3 接点を gpio-keys 化、押し込みでメイン⇄一覧の切替を実機確認。上下は未確認（Prospector キーボードが 1 台しか無かった）。一覧の自動更新タイマー（v1 で未生成）を修正 |
+| 2026-10-08 | 複数台テストで判明: 手持ちの 2 台目は **2025-07 以前の 25 バイト形式**で広告しており、現行スキャナ（26 バイト）は長さで破棄する。対処（キーボード側を焼き直す／スキャナに旧形式の読取を足す）は**保留**。複数台の確認もそれまで保留 |
 
 RAM: ZMK＋キーボード用 BLE スタックで 41.8 KiB、LCD（LVGL 1bpp、部分描画、プール 4 KiB）込みで 53.6 KiB（82%）。
 全フレーム VDB＋8 KiB プールだと 62.3 KiB（95%）になる。Phase E（observer 専用）では
 キーボード用 BLE スタックが不要になり、v1 の測定では約 32 KiB 戻る。
+
+## 残タスク（2026-10-08 時点）
+
+| 優先 | 項目 | 誰が | 備考 |
+|---|---|---|---|
+| 高 | **電池単独での動作確認**（CR2032、プローブ無し） | 実機 | これまで全部 VPROG 給電。起動・受信・LCD が電池で動くかは未確認。レールの τ=0.5 s の正体（case A/B）もここで効く可能性 |
+| 高 | 電池残量表示（nRF52832 内部 VDD 測定） | 実装 | 資料 §15。CR2032 の放電曲線は ZMK の Li-ion 曲線と違うので別途 |
+| 中 | スキャンのデューティ比と省電力 | 実装＋実測 | 現在 100% duty。`PROSPECTOR_SCAN_INTERVAL_MS`/`_WINDOW_MS` で下げられる。CR2032 の寿命を決める項目 |
+| 中 | EXTCOMIN 周波数 | 調査 | 暫定 10 Hz（表示は正常）。LS013B7DH05 データシートの値に差し替え |
+| 中 | レバーの上下の実機確認・割当調整 | 実機 | 2 台目の Prospector キーボードが要る → 保留 |
+| 中 | 旧 25 バイト形式のキーボード | 判断 | 焼き直し（推奨）か、スキャナに旧形式読取を追加か → 保留 |
+| 中 | **push** | 判断 | swd-programmer `scanner-pocket`、本リポジトリ `main`、モジュール `feature/scanner-pocket-v2.3`（＋ 9 月の `reconcile/v2.2.3`）。push 後に west.yml を `file://` から GitHub へ |
+| 低 | プローブ sense test（case A/B） | 実機 | 動作に支障なし |
+| 低 | プローブ Phase 2（手動 VPROG、FAULT 復帰、低電圧自己給電の判定） | 実装 | 資料 §10.3 Phase 2 |
+| — | 基板 rev1 の LCD コネクタ向き修正・再発注 | 基板 | 発注済み予定 |
 
 ## 既知の注意
 
