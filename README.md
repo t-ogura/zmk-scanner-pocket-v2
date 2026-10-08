@@ -1,165 +1,135 @@
 # zmk-scanner-pocket-v2
 
-FDK **HY0020**（Nordic nRF52832、512 KiB / 64 KiB）を直載せした Scanner Pocket v2 の ZMK / Zephyr
-ファームウェア。MCU がモジュール直載せなので「MCU ボード + シールド」ではなく、
-**Scanner Pocket v2 そのものを ZMK の custom board**（Hardware Model v2）として定義しています。
+**Scanner Pocket v2** — FDK **HY0020**（Nordic nRF52832、512 KiB Flash / 64 KiB RAM）を直載せした、
+Sharp Memory LCD 付きの小型 Prospector スキャナ。近くの Prospector 対応キーボードの
+レイヤー・修飾キー・電池・WPM を受信して表示します。CR2032 で動きます。
 
-書き込みは UF2 ではなく **SWD**（`swd-programmer` の RP2040-Zero プローブ + OpenOCD）で `zephyr.hex` を直接書きます。
+ファームウェアは ZMK / Zephyr。HY0020 には USB が無いので、書き込みは
+**SWD**（専用プローブ [swd-ffc6-programmer](https://github.com/t-ogura/swd-ffc6-programmer) ＋ OpenOCD）で `zephyr.hex` を直接書きます。UF2 のドラッグ&ドロップはありません。
 
-設計の正本は `SCANNER_POCKET_V2_HANDOVER.md`。firmware が参照するピンの要約は [docs/hardware.md](docs/hardware.md)。
+## 必要なもの
+
+| もの | 備考 |
+|---|---|
+| Scanner Pocket v2 基板 | rev1 は LCD コネクタの向きが設計と逆。**FPC を逆向きに挿す**（[docs/hardware.md](docs/hardware.md)） |
+| [swd-ffc6-programmer](https://github.com/t-ogura/swd-ffc6-programmer) | RP2040-Zero ベースの CMSIS-DAP プローブ。6 ピン FFC で接続、3.3 V も供給 |
+| OpenOCD 0.12 以降 | [xPack OpenOCD](https://github.com/xpack-dev-tools/openocd-xpack/releases) を展開するだけ。Windows でも WSL でも可 |
+| ビルド環境 | West ＋ Zephyr SDK（下記）。ビルド済み hex を使うなら不要 |
+
+## ファームウェアを書く
+
+### 初回（出荷時 HY0020、または ERASEALL 後）
+
+HY0020 は出荷時に **APPROTECT（デバッグ保護）が有効**で、しかも新リビジョンは電源を入れ直すたびに
+再ロックされます。初回は「解除 → 電源を切らずに → UICR に解除フラグ → 書き込み」を一続きで行う
+スクリプトを使います。
+
+```powershell
+# PowerShell（Windows）。プローブを USB 接続、Scanner Pocket の電池スイッチは OFF
+$env:OPENOCD = "C:\tools\xpack-openocd-0.12.0-7\bin\openocd.exe"
+powershell -ExecutionPolicy Bypass -File .\scripts\first_flash.ps1 build\zephyr\zmk.hex -Speed 500
+```
+
+```bash
+# Linux / WSL（USB は usbipd で attach、OpenOCD は ~/.local/opt/openocd 想定）
+scripts/first_flash.sh build/zephyr/zmk.hex --speed 500
+```
+
+成功すると `APPROTECTSTATUS = 1 (after)` → `Cortex-M4 r0p1 processor detected` → `wrote ...` → `verified ...` と進みます。
+出荷時ブートローダは消えます（この設計では使いません）。
+
+### 2 回目以降
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\flash.ps1 build\zephyr\zmk.hex -Speed 500
+```
+
+```bash
+scripts/flash.sh build/zephyr/zmk.hex --speed 500
+```
+
+`** Verified OK **` が出れば完了。失敗時は hex と同じ場所の `flash.log` に OpenOCD の出力が残ります。
+`AP lock engaged` が出たら初回手順に戻ってください（UICR が消えた＝再ロック）。
+
+### 動いているか見る
+
+- 画面: 起動後「Scanner Pocket」→ `Scanning...` → キーボードを受信すると名前・レイヤー・電池が出る
+- レバー: 押し込みでキーボード一覧 ⇄ メイン、一覧では上下で選択（3 秒無操作でメインに戻る）
+- ログ: UART は無いので **RTT**。OpenOCD を `-f scripts/rtt.cfg -c init -c "reset run" -c "sleep 500" -c rtt_go` で起動し、`localhost:9090` を TeraTerm（TCP/IP）等で開く。ログ付きビルドは `-DEXTRA_CONF_FILE=docs/rtt_logging.conf`
+
+## ビルド
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install west
+.venv/bin/west init -l config && .venv/bin/west update && .venv/bin/west zephyr-export
+.venv/bin/pip install -r zephyr/scripts/requirements-base.txt
+
+.venv/bin/west build -s zmk/app -b scanner_pocket_v2 -- \
+  -DSHIELD=scanner_pocket_v2 -DZMK_CONFIG="$PWD/config"
+# → build/zephyr/zmk.hex
+```
+
+- `scanner_pocket_v2`（board）: この基板の定義。`config/boards/t_ogura/scanner_pocket_v2/`
+- `scanner_pocket_v2`（shield）: Prospector モジュール側。observer の Kconfig と Pocket UI（`pocket_display.c`）を載せる
+- GitHub Actions（`.github/workflows/build.yaml`）でも同じものがビルドされます
+
+Zephyr SDK 0.16.5 / ZMK は `config/west.yml` で固定（2026-01-17 の `354cff9c`）。
 
 ## 構成
 
 ```
 config/
-├─ west.yml                      ZMK を 354cff9c（2026-01-17）に固定
-├─ scanner_pocket_v2.conf        ZMK 固有設定はすべてここ（ZMK_BLE, KEYBOARD_NAME, SETTINGS_NVS）
-├─ scanner_pocket_v2.keymap      レバー 3 接点 → A / B / C
-└─ boards/t_ogura/scanner_pocket_v2/
-   ├─ board.yml                  HWMv2 ボード定義（soc: nrf52832）
-   ├─ Kconfig.scanner_pocket_v2  SOC_NRF52832_QFAA を選択
-   ├─ Kconfig.defconfig          BT_CTLR のみ（純 Zephyr）
-   ├─ scanner_pocket_v2_defconfig  MPU / FLASH、HEX 出力、UF2 なし（純 Zephyr）
-   ├─ scanner_pocket_v2.dts      チップ・パーティション・kscan・(disabled) LCD
-   ├─ scanner_pocket_v2-pinctrl.dtsi  LCD SPI ピン
-   ├─ board.cmake                west flash → openocd（cmsis-dap, nrf52）
-   └─ *.yaml / *.zmk.yml         メタデータ
-app/phase_a_blink/               Phase A: ZMK 抜きの GPIO トグル（最初に SWD で書くもの）
-app/phase_d_lcd/                 Phase D: ZMK/LVGL 抜きで LCD にテストパターン（display API 直叩き）
-app/phase_d_pinfind/             診断: HY0020 の 12 GPIO を順に High にして DISP を目視で探す
-app/phase_d_bitbang/             診断: SPI/表示ドライバを使わず GPIO で LS013B7DH05 を直接駆動
-scripts/flash.sh, flash.ps1      OpenOCD で program / verify / reset を 1 コマンド化
-build.yaml                       CI 用ビルド行列
+├─ west.yml                      ZMK と prospector-zmk-module の取り込み
+├─ scanner_pocket_v2.conf        observer 専用、LVGL 1bpp 部分描画、CR2032 電池、ログ無し
+├─ scanner_pocket_v2.keymap      キーマップは &none（キーボードではない）
+└─ boards/t_ogura/scanner_pocket_v2/   HWMv2 ボード定義（nrf52832_ciaa、LCD、レバー、電池、SWD 用 board.cmake）
+scripts/
+├─ flash.ps1 / flash.sh          通常の書き込み
+├─ first_flash.ps1 / .sh         初回: APPROTECT 解除 + UICR + 書き込み
+├─ nrf52_recover_daponly.cfg     解除の本体（DAP のみで CTRL-AP ERASEALL。標準の nrf52_recover はこの個体で失敗する）
+└─ rtt.cfg                       RTT コンソール
+app/
+├─ phase_a_blink/                素の Zephyr: GPIO トグル（最初に SWD で書くもの）
+├─ phase_d_lcd/                  素の Zephyr: LCD テストパターン
+├─ phase_d_pinfind/              診断: GPIO を順に High にして DISP を探す
+└─ phase_d_bitbang/              診断: GPIO 直叩きで LCD を駆動
+docs/
+├─ hardware.md                   ピン配置（確定/要確認）、rev1 の既知の不具合
+├─ observer_trial*.conf, rtt_logging.conf   追加 conf のサンプル
+└─ lcd_stripes_2026-10-08.jpg    FPC 逆挿しのときの見え方
 ```
 
-ボード定義は**純粋な Zephyr** に保っています（ZMK シンボルを一切含まない）。そうしないと ZMK 抜きの
-`app/phase_a_blink` が「未定義シンボル」の Kconfig 警告で止まるためで、ZMK 固有の設定は `config/scanner_pocket_v2.conf` 側に集めてあります。
+## メモリ
 
-ボード定義を `config/boards/` に置いているのは、ZMK が `ZMK_CONFIG` を `BOARD_ROOT` に追加する
-（`zmk/app/keymap-module/modules/modules.cmake`）ため、追加の `zephyr/module.yml` 無しで
-発見されるからです。別リポジトリから共有したくなったら module 化すればよい。
-
-## 判断した点
-
-| 項目 | 判断 | 理由 |
+| 構成 | FLASH | RAM（64 KiB） |
 |---|---|---|
-| SoC | `nrf52832_ciaa` | 実機で OpenOCD が `nRF52832-CIAA (G1)` と報告。512K/64K。QFAA との差は compatible のみ |
-| ブートローダ | なし | SWD 直書きなので不要。アプリは 0x0 から、設定領域は末尾 24 KiB |
-| nRESET | `gpio-as-nreset` | P0.21 をリセットに。リセット SW と FFC の両方が効く |
-| DCDC | **無効（LDO）** | モジュール内 DCC/DEC4 結線は firmware だけで判断しない（資料 §24）。実測後に有効化 |
-| USB | 一切なし | nRF52832 に USB ペリフェラル無し。`ZMK_USB` は設定しない |
-| LCD ノード | **有効**、SPI は `nordic,nrf-spi` | nRF52832 は PAN 58 で SPIM が既定無効。**5 本とも実機で動作確認済み**。EXTCOMIN 10 Hz は暫定（データシート値に差し替え） |
-| レバー入力 | direct GPIO | P0.18/20/30 を**実機確認済み**（3 接点とも BLE で A/B/C が入る） |
-| コンソール | なし（必要時 RTT） | UART 未結線。`CONFIG_ZMK_RTT_LOGGING=y` で SWD 越しに読む |
+| 現行（observer ＋ 横向き UI ＋ 電池） | 200 KB (40%) | **48.5 KB (74%)** |
+| ZMK キーボード役を残した場合 | — | 5 KB 超過で不可 |
 
-## ビルド
+## ハードウェアの判断（詳細は docs/hardware.md）
 
-```bash
-cd zmk-scanner-pocket-v2
-.venv/bin/west build -s zmk/app -b scanner_pocket_v2 -- \
-  -DSHIELD=scanner_pocket_v2 -DZMK_CONFIG="$PWD/config"
-# → build/zephyr/zmk.hex
-# shield scanner_pocket_v2 = prospector-zmk-module の boards/shields/scanner_pocket_v2
-#   （観測役の Kconfig 既定 ＋ v1 の pocket_display.c をそのまま参照。overlay は空）
-```
-
-初回のみ: `python3 -m venv .venv && .venv/bin/pip install west && .venv/bin/west init -l config && .venv/bin/west update && .venv/bin/west zephyr-export && .venv/bin/pip install -r zephyr/scripts/requirements-base.txt`
-
-Phase A の最小アプリ（ZMK 抜き。SWD と board 定義の疎通確認用）:
-
-```bash
-.venv/bin/west build -s app/phase_a_blink -d build-phase-a -b scanner_pocket_v2 -- \
-  -DBOARD_ROOT="$PWD/config" -DDTS_ROOT="$PWD/zmk/app"
-# → build-phase-a/zephyr/zephyr.hex   P0.16 を 1 Hz、P0.12 を 2 Hz でトグル
-```
-
-## 書き込み
-
-```bash
-scripts/flash.sh build/zephyr/zmk.hex            # Linux / WSL（usbipd で USB を attach）
-.\scripts\flash.ps1 build\zephyr\zmk.hex         # Windows ネイティブ OpenOCD
-```
-
-初回は `--speed 500` 推奨。内部は `openocd -f interface/cmsis-dap.cfg -f target/nordic/nrf52.cfg -c "program <hex> verify reset exit"`。
-失敗時は `build/zephyr/flash.log` が残ります。`west flash -r openocd` も board.cmake で使えます。
-
-## APPROTECT の解除（出荷時ブートローダ入りの HY0020）
-
-HY0020 は出荷時にブートローダが書かれ、**APPROTECT（デバッグアクセス保護）が有効**でした。
-`init; reset halt` で `SWD DPIDR 0x2ba01477` は読めるのに `Could not find MEM-AP` と
-`AP lock engaged` が出るのがその症状です。
-
-OpenOCD 標準の `nrf52_recover` は**この個体では失敗します**（`ERASEALLSTATUS` が 1 のまま）。
-`target/nordic/nrf52.cfg` が作る Cortex-M ターゲットの examination がロック中は失敗し、
-その状態で発行した CTRL-AP ERASEALL が進まないためです。ターゲットを定義せず DAP だけで
-CTRL-AP を叩く [scripts/nrf52_recover_daponly.cfg](scripts/nrf52_recover_daponly.cfg) なら
-100 ms 以内に完了します（2026-10-08 実機確認）。
-
-```powershell
-openocd.exe -f interface/cmsis-dap.cfg -f scripts\nrf52_recover_daponly.cfg `
-  -c "adapter speed 500" -c "init" -c "recover_daponly" -c "exit"
-# APPROTECTSTATUS = 1 (after) が出たら、ターゲットを電源断（10 秒）→ 通常の init; reset halt
-```
-
-`target/nordic/nrf52.cfg` は**同時に読み込まない**こと。消去はフラッシュ全域と UICR を消し、
-出荷時ブートローダは失われます（この設計では使わないので問題ない）。電源不足が原因ではなかった
-ことも確認済み（消去中の VTREF min 3.02 V、3.0 V 未満のサンプル 0）。
-
-### 電源を切ると再ロックされる（hardened APPROTECT）
-
-解除後に電源を入れ直すと**再びロック**されました。この個体は新しいシリコンリビジョンで、
-APPROTECT が電源投入時のデフォルトで有効になる仕様（hardened APPROTECT）です。
-開いた状態を保つには **UICR.APPROTECT = 0x5A（HwDisabled）** が書かれていて、かつファームウェアが
-起動時に `APPROTECT.DISABLE` を書く必要があります。後者は Zephyr の既定
-（`CONFIG_NRF_APPROTECT_USE_UICR=y` → MDK が `DISABLE = UICR.APPROTECT` を実行）で満たされます。
-
-したがって初回だけ、**解除 → 電源を切らずに → UICR に 0x5A → 書き込み** を一続きで行います:
-
-```powershell
-$env:OPENOCD = "C:\tools\xpack-openocd-0.12.0-7\bin\openocd.exe"
-.\scripts\first_flash.ps1 build-phase-a\zephyr\zephyr.hex -Speed 500
-```
-
-（Linux/WSL: `scripts/first_flash.sh`）。以後は UICR が 0x5A のまま残るので `flash.ps1` で普通に書けます。
-`flash write_image erase` はアプリのセクタしか消さないため UICR は保たれます。再び ERASEALL を
-したときだけ、もう一度 `first_flash` が必要です。
-
-## 現状
-
-| 日付 | 内容 |
+| 項目 | 判断 |
 |---|---|
-| 2026-10-08 | リポジトリ作成。HWMv2 ボード定義、ZMK ビルド成功: **FLASH 178,616 B (35.7%) / RAM 41,844 B (63.9%)**。Phase A アプリ作成 |
-| 2026-10-08 | 実機: プローブから SWD 疎通 OK。HY0020 は出荷時 APPROTECT 有効（hardened、電源断で再ロック）→ `first_flash.ps1` で解除＋UICR 0x5A＋Phase A 書き込み・verify 成功。**資料 §26 の 7 項目達成**。チップは nRF52832-CIAA G1。Phase A が実機で動作（RTT で `tick` カウント確認、`scripts/rtt.cfg`）。ZMK 本体も通常の `flash.ps1` で書込・verify OK（UICR 0x5A 後は `program` のリセットでも再ロックされない）。**Phase B 達成**: BLE 広告が見える（プローブ給電下）。**Phase C 達成**: ペアリング後にレバー 3 接点で A/B/C 入力。名前を `Scanner Pocket` に変更。LCD ノード有効化＋`app/phase_d_lcd` 作成 |
-| 2026-10-08 | **Phase D 達成**: `app/phase_d_lcd` のテストカードが `ls0xx` ドライバ経由で正常表示。それまでの「白のまま」「不規則な縞」は **LCD の FPC の接点面が逆**だったのが原因。基板 rev1 はコネクタ向きが設計と逆で、**逆挿しで開発続行、次版で修正**（docs/hardware.md 参照）。第二マイルストーンの 3 要素（BLE・レバー・LCD）が個別に動作 |
-| 2026-10-08 | ZMK に LCD を統合（内蔵ステータス画面、LVGL 1bpp、プール 8 KiB、VDB 100%、当時はキーボード役）: **FLASH 315,824 B (63.2%) / RAM 62,324 B (95.1%)**。表示系の増分は 20,480 B |
-| 2026-10-08 | **第二マイルストーン達成**: 内蔵ステータス画面が LCD に表示され、BLE・レバーと同時動作。部分描画（VDB 25%、X alignment 144）＋プール 4 KiB を実機で確認し採用: **RAM 53,620 B (81.8%)**。Prospector の受信機能はまだ無い（Phase E） |
-| 2026-10-08 | Phase E 準備: Prospector モジュールを west に追加、コアに observer 専用時の `bt_enable()` を追加、v1 の Pocket UI を載せる薄いシールド `scanner_pocket_v2` をモジュールに作成。方向の実測: **A observer 専用 = RAM 45,212 B (69.0%)**、B キーボード役＋observer = **5,108 B 超過でリンク不能**。A の試用 hex を `scanner_pocket_v2_observer.hex` として配布 |
-| 2026-10-08 | 初回は白画面＋表示スレッドで BUS FAULT。原因は `SHIELD_SCANNER_POCKET=y` の副作用（v1 の回転ドライバが選ばれ DISP が上がらず、幅 168 に対し整列幅 144 で LVGL ヒープ破壊）。外して修正、プール 16 KiB |
-| 2026-10-08 | **Phase E 受信成功**: observer 専用構成で Pocket UI が表示され、近くの Prospector キーボードの情報を読み取る。**RAM 44,060 B (67.2%) / FLASH 196,744 B**。この構成を正式採用（`CONFIG_ZMK_BLE=n`、shield `scanner_pocket_v2`） |
-| 2026-10-08 | **横向き表示 OK**（v1 回転ドライバに DISP/EXTCOMIN 対応を追加、RAM 47,132 B = 71.9%）。**レバー**: 3 接点を gpio-keys 化、押し込みでメイン⇄一覧の切替を実機確認。上下は未確認（Prospector キーボードが 1 台しか無かった）。一覧の自動更新タイマー（v1 で未生成）を修正 |
-| 2026-10-08 | 複数台テストで判明: 手持ちの 2 台目は **2025-07 以前の 25 バイト形式**で広告しており、現行スキャナ（26 バイト）は長さで破棄する。対処（キーボード側を焼き直す／スキャナに旧形式の読取を足す）は**保留**。複数台の確認もそれまで保留 |
+| SoC | `nrf52832_ciaa`（OpenOCD が実機で報告。512K/64K） |
+| ブートローダ | 無し。アプリは 0x0 から、設定領域は末尾 24 KiB |
+| nRESET | P0.21 を `gpio-as-nreset` |
+| DCDC | 無効（LDO）。実測後に検討 |
+| USB | 無し |
+| LCD | ストック `ls0xx` ではなく v1 の回転ドライバ（DISP/EXTCOMIN 対応を追加）で横向き 168×144。SPI は `nordic,nrf-spi`（PAN 58） |
+| レバー | P0.18/20/30 を gpio-keys で UI 操作。ZMK 用ダミー kscan は P0.28 |
+| 電池 | SAADC の VDD 入力を直接測定（`prospector,battery-nrf-vdd`）、CR2032 曲線 |
+| EXTCOMIN | 10 Hz **暫定**（データシート値に差し替え予定） |
 
-RAM: ZMK＋キーボード用 BLE スタックで 41.8 KiB、LCD（LVGL 1bpp、部分描画、プール 4 KiB）込みで 53.6 KiB（82%）。
-全フレーム VDB＋8 KiB プールだと 62.3 KiB（95%）になる。Phase E（observer 専用）では
-キーボード用 BLE スタックが不要になり、v1 の測定では約 32 KiB 戻る。
+## 残タスク
 
-## 残タスク（2026-10-08 時点）
+- 電池放電曲線の校正（3.0 V を割ってから）
+- スキャンのデューティ比と省電力（現在 100% duty）
+- EXTCOMIN 周波数のデータシート確認
+- 2025-07 以前の 25 バイト形式で広告する古いキーボードへの対応（焼き直し推奨）、複数台の実機確認
+- 基板 rev1 の LCD コネクタ向き修正
 
-| 優先 | 項目 | 誰が | 備考 |
-|---|---|---|---|
-| 高 | **電池単独での動作確認**（CR2032、プローブ無し） | 実機 | これまで全部 VPROG 給電。起動・受信・LCD が電池で動くかは未確認。レールの τ=0.5 s の正体（case A/B）もここで効く可能性 |
-| 高 | 電池残量表示（nRF52832 内部 VDD 測定） | 実装 | 資料 §15。CR2032 の放電曲線は ZMK の Li-ion 曲線と違うので別途 |
-| 中 | スキャンのデューティ比と省電力 | 実装＋実測 | 現在 100% duty。`PROSPECTOR_SCAN_INTERVAL_MS`/`_WINDOW_MS` で下げられる。CR2032 の寿命を決める項目 |
-| 中 | EXTCOMIN 周波数 | 調査 | 暫定 10 Hz（表示は正常）。LS013B7DH05 データシートの値に差し替え |
-| 中 | レバーの上下の実機確認・割当調整 | 実機 | 2 台目の Prospector キーボードが要る → 保留 |
-| 中 | 旧 25 バイト形式のキーボード | 判断 | 焼き直し（推奨）か、スキャナに旧形式読取を追加か → 保留 |
-| 中 | **push** | 判断 | swd-programmer `scanner-pocket`、本リポジトリ `main`、モジュール `feature/scanner-pocket-v2.3`（＋ 9 月の `reconcile/v2.2.3`）。push 後に west.yml を `file://` から GitHub へ |
-| 低 | プローブ sense test（case A/B） | 実機 | 動作に支障なし |
-| 低 | プローブ Phase 2（手動 VPROG、FAULT 復帰、低電圧自己給電の判定） | 実装 | 資料 §10.3 Phase 2 |
-| — | 基板 rev1 の LCD コネクタ向き修正・再発注 | 基板 | 発注済み予定 |
+## 経緯（2026-10-08）
 
-## 既知の注意
-
-- `west.yml` は ZMK を固定していますが、ZMK が import する Zephyr は `v4.1.0+zmk-fixes` **ブランチ**なので
-  `west update` のたびに動きます（今回取得: `10ba6d0c` 2026-08-13）。再現性が要るなら Zephyr も SHA 固定にする
-- ビルド時の `battery.c` の `#warning`（BATTERY ラベル非推奨）は電池センサ未定義のため。VDD 内部測定を実装するときに `zmk,battery` chosen を定義して解消
+1 日で、プローブ単体試験 → APPROTECT 解除 → Phase A（GPIO）→ BLE → レバー → LCD → observer 受信 → 横向き → 電池表示まで到達。
+詰まった箇所と教訓は [docs/hardware.md](docs/hardware.md) に残してあります（LCD の FPC の向き、hardened APPROTECT、
+`SHIELD_SCANNER_POCKET` を v2 から立ててはいけない理由）。詳しい作業ログは git log を参照。
